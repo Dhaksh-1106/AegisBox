@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AegisBox — Organ Transport Monitor</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #f4f4f0;
+      --surface:    #ffffff;
+      --panel:      #ffffff;
+      --border:     #d0d0c8;
+      --border-dim: #e4e4de;
+      --text:       #1a1a18;
+      --text-dim:   #5a5a54;
+      --text-muted: #9a9a92;
+      --accent:     #1a6e3c;   /* deep green */
+      --accent-bg:  #e8f4ed;
+      --warn:       #b45309;
+      --warn-bg:    #fef3e2;
+      --danger:     #b91c1c;
+      --danger-bg:  #fef2f2;
+      --ok:         #1a6e3c;
+      --font-serif: 'Times New Roman', Times, serif;
+      --font-mono:  'Courier New', Courier, monospace;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      padding: 40px;
+      line-height: 1.4;
+    }
+
+    header {
+      margin-bottom: 40px;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 20px;
+    }
+
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: 32px;
+      font-weight: normal;
+      letter-spacing: -0.5px;
+    }
+
+    .system-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      background: #9a9a92;
+      border-radius: 50%;
+    }
+
+    .meta-bar {
+      display: flex;
+      gap: 24px;
+      margin-top: 12px;
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+    .meta-bar span strong {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    /* Banner for waiting connection */
+    .awaiting-banner {
+      background: var(--warn-bg);
+      border: 1px solid var(--warn);
+      color: var(--warn);
+      padding: 12px 16px;
+      font-size: 14px;
+      margin-bottom: 30px;
+      border-radius: 2px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Main Grid Layout */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 40px;
+      align-items: start;
+    }
+
+    /* Left Side Elements */
+    .main-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 40px;
+    }
+
+    /* Health Overview Component */
+    .health-overview-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 30px;
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      gap: 40px;
+      align-items: center;
+    }
+
+    .health-score-circle {
+      text-align: center;
+    }
+    .health-score-number {
+      font-family: var(--font-serif);
+      font-size: 72px;
+      line-height: 1;
+      color: var(--text);
+    }
+    .health-score-number.ok { color: var(--ok); }
+    .health-score-number.warn { color: var(--warn); }
+    .health-score-number.danger { color: var(--danger); }
+    
+    .health-score-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .health-details h2 {
+      font-family: var(--font-serif);
+      font-size: 24px;
+      font-weight: normal;
+      margin-bottom: 16px;
+    }
+
+    .health-breakdown {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .breakdown-row {
+      display: flex;
+      align-items: center;
+      font-size: 13px;
+    }
+    .breakdown-label {
+      width: 100px;
+      color: var(--text-dim);
+    }
+    .breakdown-bar-bg {
+      flex-grow: 1;
+      height: 6px;
+      background: var(--bg);
+      margin: 0 16px;
+      position: relative;
+    }
+    .breakdown-bar {
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      background: var(--accent);
+      width: 0%;
+      transition: width 0.4s ease;
+    }
+    .breakdown-bar.warn { background: var(--warn); }
+    .breakdown-bar.danger { background: var(--danger); }
+    .breakdown-score {
+      width: 24px;
+      text-align: right;
+      font-weight: 500;
+    }
+    .breakdown-score.warn { color: var(--warn); }
+    .breakdown-score.danger { color: var(--danger); }
+
+    /* Sensor Cards Grid */
+    .sensors-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+    }
+
+    .sensor-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      position: relative;
+      transition: border-color 0.2s, background-color 0.2s;
+    }
+
+    .sensor-card.state-warn {
+      border-color: var(--warn);
+      background-color: var(--warn-bg);
+    }
+    .sensor-card.state-danger {
+      border-color: var(--danger);
+      background-color: var(--danger-bg);
+    }
+
+    .sensor-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    .sensor-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-dim);
+      font-weight: 500;
+    }
+
+    .sensor-value {
+      font-family: var(--font-serif);
+      font-size: 40px;
+      line-height: 1;
+      color: var(--text);
+    }
+    .sensor-unit {
+      font-family: sans-serif;
+      font-size: 18px;
+      color: var(--text-dim);
+      margin-left: 4px;
+    }
+
+    .sensor-bar-bg {
+      height: 4px;
+      background: var(--border-dim);
+      width: 100%;
+    }
+    .sensor-bar {
+      height: 100%;
+      background: var(--text);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    .sensor-bar.warn { background: var(--warn); }
+    .sensor-bar.danger { background: var(--danger); }
+
+    .sensor-status {
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+    .sensor-status.ok { color: var(--ok); }
+    .sensor-status.warn { color: var(--warn); font-weight: 500; }
+    .sensor-status.danger { color: var(--danger); font-weight: 500; }
+
+    /* Tamper specialized block */
+    .tamper-block {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 4px;
+    }
+    .tamper-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--border);
+    }
+    .tamper-dot.sealed { background: var(--ok); }
+    .tamper-dot.breached { background: var(--danger); animation: blink 1s infinite; }
+    .tamper-text { font-family: var(--font-serif); font-size: 22px; }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* Right Side Elements */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 40px;
+    }
+
+    .side-block-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .alert-count-label {
+      font-size: 11px;
+      padding: 2px 6px;
+      background: var(--border-dim);
+      color: var(--text-dim);
+      border-radius: 10px;
+    }
+    .alert-count-label.has-alerts {
+      background: var(--danger-bg);
+      color: var(--danger);
+      font-weight: bold;
+    }
+
+    .alert-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 24px;
+      max-height: 380px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .alert-entries {
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .alert-empty {
+      color: var(--text-muted);
+      font-size: 13px;
+      text-align: center;
+      padding: 20px 0;
+      font-style: italic;
+    }
+
+    .alert-entry {
+      padding: 12px;
+      border-left: 3px solid var(--border);
+      background: var(--bg);
+      font-size: 13px;
+    }
+    .alert-entry.warn { border-left-color: var(--warn); background: var(--warn-bg); }
+    .alert-entry.danger { border-left-color: var(--danger); background: var(--danger-bg); }
+
+    .alert-time {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      margin-bottom: 4px;
+    }
+    .alert-level {
+      font-size: 10px;
+      font-weight: bold;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+    .alert-level.warn { color: var(--warn); }
+    .alert-level.danger { color: var(--danger); }
+    .alert-msg {
+      color: var(--text);
+    }
+
+    /* Diagnostics Block */
+    .diag-box {
+      background: #1a1a1a;
+      color: #a0a0a0;
+      border: 1px solid #2a2a2a;
+      padding: 24px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    .diag-box h3 {
+      color: #f0f0f0;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
+      font-family: sans-serif;
+    }
+    .diag-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .diag-value { color: #e0e0e0; }
+    pre.raw-json {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #333;
+      color: #4ade80;
+      overflow-x: auto;
+      max-height: 150px;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-top">
+      <h1>AegisBox — Cold-Chain Logistics</h1>
+      <div class="system-status">
+        <div class="status-dot" id="conn-dot"></div>
+        <span id="conn-label">Awaiting Stream</span>
+      </div>
+    </div>
+    <div class="meta-bar">
+      <span>Device ID: <strong id="device-id">—</strong></span>
+      <span>Last Feed Update: <strong id="last-update">—</strong></span>
+    </div>
+  </header>
+
+  <div class="awaiting-banner" id="awaiting-banner">
+    <div class="status-dot" style="background:var(--warn); width:10px; height:10px; animation: blink 1s infinite;"></div>
+    <span><strong>System Ready : </strong> Connect to hardware unit to spin up live metrics.</span>
+  </div>
+
+  <div class="dashboard-grid">
+    
+    <div class="main-panel">
+      
+      <div class="health-overview-card">
+        <div class="health-score-circle">
+          <div class="health-score-number" id="health-score-number">—</div>
+          <div class="health-score-label">Viability Index</div>
+        </div>
+        <div class="health-details">
+          <h2 id="health-grade">Pending Ingestion</h2>
+          <div class="health-breakdown">
+            <div class="breakdown-row">
+              <span class="breakdown-label">Thermal Layer</span>
+              <div class="breakdown-bar-bg"><div class="breakdown-bar" id="bbar-temp"></div></div>
+              <span class="breakdown-score" id="bscore-temp">—</span>
+            </div>
+            <div class="breakdown-row">
+              <span class="breakdown-label">Humidity Constraint</span>
+              <div class="breakdown-bar-bg"><div class="breakdown-bar" id="bbar-hum"></div></div>
+              <span class="breakdown-score" id="bscore-hum">—</span>
+            </div>
+            <div class="breakdown-row">
+              <span class="breakdown-label">Kinetic Impact</span>
+              <div class="breakdown-bar-bg"><div class="breakdown-bar" id="bbar-g"></div></div>
+              <span class="breakdown-score" id="bscore-g">—</span>
+            </div>
+            <div class="breakdown-row">
+              <span class="breakdown-label">Chamber Seal</span>
+              <div class="breakdown-bar-bg"><div class="breakdown-bar" id="bbar-tamper"></div></div>
+              <span class="breakdown-score" id="bscore-tamper">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sensors-grid">
+        
+        <div class="sensor-card" id="card-temp">
+          <div class="sensor-header">
+            <span class="sensor-title">Internal Core Temperature</span>
+          </div>
+          <div class="sensor-value" id="val-temp">—</div>
+          <div class="sensor-bar-bg"><div class="sensor-bar" id="bar-temp"></div></div>
+          <div class="sensor-status" id="status-temp">Awaiting data iteration...</div>
+        </div>
+
+        <div class="sensor-card" id="card-hum">
+          <div class="sensor-header">
+            <span class="sensor-title">Relative Chamber Humidity</span>
+          </div>
+          <div class="sensor-value" id="val-humidity">—</div>
+          <div class="sensor-bar-bg"><div class="sensor-bar" id="bar-humidity"></div></div>
+          <div class="sensor-status" id="status-humidity">Awaiting data iteration...</div>
+        </div>
+
+        <div class="sensor-card" id="card-gforce">
+          <div class="sensor-header">
+            <span class="sensor-title">Combined G-Force Vector</span>
+          </div>
+          <div class="sensor-value" id="val-gforce">—</div>
+          <div class="sensor-bar-bg"><div class="sensor-bar" id="bar-gforce"></div></div>
+          <div class="sensor-status" id="status-gforce">Awaiting data iteration...</div>
+        </div>
+
+        <div class="sensor-card" id="card-impacts">
+          <div class="sensor-header">
+            <span class="sensor-title">G-Shock Cumulative Exceptions</span>
+          </div>
+          <div class="sensor-value" id="val-impacts">—</div>
+          <div class="sensor-bar-bg"><div class="sensor-bar" id="bar-impacts" style="width:0%"></div></div>
+          <div class="sensor-status" id="status-impacts">Awaiting data iteration...</div>
+        </div>
+
+        <div class="sensor-card" id="card-ldr">
+          <div class="sensor-header">
+            <span class="sensor-title">LDR Photo-Resistor Lumens</span>
+          </div>
+          <div class="sensor-value" id="val-ldr">—</div>
+          <div class="sensor-bar-bg"><div class="sensor-bar" id="bar-ldr"></div></div>
+          <div class="sensor-status" id="status-ldr">Awaiting data iteration...</div>
+        </div>
+
+        <div class="sensor-card" id="card-tamper">
+          <div class="sensor-header">
+            <span class="sensor-title">Physical Enclosure Security</span>
+          </div>
+          <div class="tamper-block">
+            <div class="tamper-dot" id="tamper-dot"></div>
+            <div class="tamper-text" id="tamper-text">—</div>
+          </div>
+          <div class="sensor-status" id="status-tamper">Awaiting connection handshake...</div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="sidebar">
+      
+      <div>
+        <div class="side-block-title">
+          <span>Active Threat Event Log</span>
+          <span class="alert-count-label" id="alert-count-label">0 alerts</span>
+        </div>
+        <div class="alert-box">
+          <div class="alert-entries" id="alert-entries">
+            <div class="alert-empty" id="alert-empty">No security anomalies or threshold violations registered within this transport run context.</div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="side-block-title">Asynchronous Pipeline Diagnostics</div>
+        <div class="diag-box">
+          <h3>Telemetry Bus Metadata</h3>
+          <div class="diag-row"><span>Ingested Inbound Packets:</span><span class="diag-value" id="meta-packets">0</span></div>
+          <div class="diag-row"><span>Network Link RSSI:</span><span class="diag-value" id="meta-rssi">—</span></div>
+          <div class="diag-row"><span>System Up-Time Tick:</span><span class="diag-value" id="val-uptime">—</span></div>
+          <div class="diag-row"><span>Interface Topology:</span><span class="diag-value" id="meta-proto">WEBSOCKET / HTTP</span></div>
+          <div class="diag-row"><span>Server Host Node Loop:</span><span class="diag-value" id="meta-ip">127.0.0.1</span></div>
+          
+          <pre class="raw-json" id="raw-payload">// Raw JSON Telemetry Data Struct Frame buffer awaiting ingestion...</pre>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    var packetCount  = 0;
+    var alertCount   = 0;
+    var hasData      = false;
+
+    function fmt(n, d) { return (typeof n === 'number' && !isNaN(n)) ? n.toFixed(d) : '—'; }
+    function pad(n) { return n < 10 ? '0' + n : '' + n; }
+    
+    function fmtUptime(s) {
+      var h = Math.floor(s / 3600);
+      var m = Math.floor((s % 3600) / 60);
+      var sec = s % 60;
+      return pad(h) + ':' + pad(m) + ':' + pad(sec);
+    }
+
+    function nowStr() { return new Date().toLocaleTimeString('en-IN', { hour12: false }); }
+    function setCardState(cardId, state) { var c = document.getElementById(cardId); if(c) c.className = 'sensor-card' + (state ? ' state-' + state : ''); }
+    
+    function setBar(id, pct, cls) {
+      var el = document.getElementById(id);
+      if(!el) return;
+      el.style.width = Math.min(100, Math.max(0, pct)) + '%';
+      el.className = 'sensor-bar' + (cls ? ' ' + cls : '');
+    }
+
+    function setStatus(id, text, cls) {
+      var el = document.getElementById(id);
+      if(!el) return;
+      el.textContent = text;
+      el.className = 'sensor-status' + (cls ? ' ' + cls : '');
+    }
+
+    function setVal(id, html) { var el = document.getElementById(id); if(el) el.innerHTML = html; }
+
+    function pushAlert(level, message) {
+      alertCount++;
+      var lbl = document.getElementById('alert-count-label');
+      if(lbl) { lbl.textContent = alertCount + (alertCount === 1 ? ' alert' : ' alerts'); lbl.className = 'alert-count-label has-alerts'; }
+      var empty = document.getElementById('alert-empty'); if (empty) empty.remove();
+      var container = document.getElementById('alert-entries'); if(!container) return;
+      var row = document.createElement('div');
+      row.className = 'alert-entry ' + level;
+      row.innerHTML = '<div class="alert-time">' + nowStr() + '</div><div class="alert-level ' + level + '">' + level.toUpperCase() + '</div><div class="alert-msg">' + message + '</div>';
+      container.insertBefore(row, container.firstChild);
+    }
+
+    function computeHealthScore(temp, hum, gforce, tamper, override) {
+      if (override !== null && override !== undefined) return { total: Math.round(override), t: 100, h: 100, g: 100, seal: tamper ? 0 : 100 };
+      var tScore = temp >= 25 && temp <= 29 ? 100 : temp < 25 ? Math.max(0, 100 - (25 - temp) * 18) : Math.max(0, 100 - (temp - 29) * 14);
+      var hScore = hum >= 50 && hum <= 70 ? 100 : hum < 50 ? Math.max(0, 100 - (50 - hum) * 3) : Math.max(0, 100 - (hum - 70) * 4);
+      var gScore = gforce <= 1.2 ? 100 : gforce <= 1.8 ? Math.max(0, 100 - (gforce - 1.8) * 42) : 0;
+      var sealScore = tamper ? 0 : 100;
+      var total = Math.round(tScore * 0.35 + hScore * 0.25 + gScore * 0.25 + sealScore * 0.15);
+      return { total: total, t: Math.round(tScore), h: Math.round(hScore), g: Math.round(gScore), seal: Math.round(sealScore) };
+    }
+
+    function gradeFromScore(s) {
+      if (s >= 90) return { label: 'Optimal Condition', cls: 'ok' };
+      if (s >= 70) return { label: 'Acceptable', cls: 'warn' };
+      if (s >= 50) return { label: 'Degraded — Monitor', cls: 'warn' };
+      return { label: 'Critical — Intervene', cls: 'danger' };
+    }
+
+    function barCls(s) { return s >= 80 ? '' : s >= 50 ? 'warn' : 'danger'; }
+
+    function updateUI(p) {
+      packetCount++;
+      if (!hasData) { hasData = true; document.getElementById('awaiting-banner').style.display = 'none'; document.getElementById('conn-label').textContent = 'Live'; document.getElementById('conn-dot').style.background = 'var(--accent)'; }
+      document.getElementById('last-update').textContent = nowStr();
+      if (p.device_id) document.getElementById('device-id').textContent = p.device_id;
+
+      var temp = p.temperature; var tOk = temp >= 25 && temp <= 29; var tWarn = !tOk && temp >= 23 && temp <= 31; var tState = tOk ? 'ok' : (tWarn ? 'warn' : 'danger');
+      setVal('val-temp', fmt(temp, 1) + '<span class="sensor-unit">°C</span>'); setBar('bar-temp', Math.min(100, (temp / 15) * 100), tState === 'ok' ? '' : tState);
+      setStatus('status-temp', tOk ? 'Within safe range ( 25 – 29 °C )' : tWarn ? 'Approaching limit' : 'Out of safe range — critical', tState); setCardState('card-temp', tState === 'ok' ? '' : tState);
+      if (!tOk) pushAlert(tWarn ? 'warn' : 'danger', 'Temperature ' + fmt(temp, 1) + ' °C is ' + (temp < 25 ? 'below' : 'above') + ' safe range.');
+
+      var hum = p.humidity; var hOk = hum >= 50 && hum <= 70; var hWarn = !hOk && hum >= 40; var hState = hOk ? 'ok' : (hWarn ? 'warn' : 'danger');
+      setVal('val-humidity', fmt(hum, 1) + '<span class="sensor-unit">%</span>'); setBar('bar-humidity', hum, hState === 'ok' ? '' : hState);
+      setStatus('status-humidity', hOk ? 'Within safe range ( 50 – 70 % )' : hWarn ? 'Approaching limit' : 'Out of safe range', hState); setCardState('card-hum', hState === 'ok' ? '' : hState);
+      if (!hOk) pushAlert(hWarn ? 'warn' : 'danger', 'Humidity ' + fmt(hum, 1) + '% outside safe range ( 50–70 % ).');
+
+      var g = p.gforce; var gOk = g <= 1.2; var gImpact = g > 1.8; var gState = gOk ? 'ok' : (gImpact ? 'danger' : 'warn');
+      setVal('val-gforce', fmt(g, 2) + '<span class="sensor-unit">g</span>'); setBar('bar-gforce', Math.min(100, (g / 6) * 100), gState === 'ok' ? '' : gState);
+      setStatus('status-gforce', gOk ? 'Stable' : gImpact ? 'Drop / Impact Detected' : 'Elevated vibration', gState); setCardState('card-gforce', gState === 'ok' ? '' : gState);
+      if (gImpact) pushAlert('danger', 'Impact event — G-force: ' + fmt(g, 2) + ' g ( threshold: 1.8 g )'); else if (!gOk) pushAlert('warn', 'Elevated vibration — G-force: ' + fmt(g, 2) + ' g');
+
+      var ic = p.impact_count !== undefined ? p.impact_count : '—'; document.getElementById('val-impacts').textContent = ic;
+      setStatus('status-impacts', ic === 0 ? 'No impacts recorded' : ic + ' impact event(s) logged', ic > 0 ? 'danger' : 'ok'); setCardState('card-impacts', ic > 0 ? 'danger' : '');
+
+      var lux = p.ldr_lux; var ldrState = p.tamper ? 'danger' : 'ok';
+      setVal('val-ldr', fmt(lux, 1) + '<span class="sensor-unit">lux</span>'); setBar('bar-ldr', Math.min(100, (lux / 200) * 100), p.tamper ? 'danger' : '');
+      setStatus('status-ldr', p.tamper ? 'Light detected inside box' : 'Sealed — dark interior', ldrState); setCardState('card-ldr', p.tamper ? 'danger' : '');
+
+      var dot = document.getElementById('tamper-dot'); var tt = document.getElementById('tamper-text');
+      if (p.tamper) { if(dot) dot.className = 'tamper-dot breached'; if(tt) tt.textContent = 'Unauthorized opening detected'; setStatus('status-tamper', 'Breach event logged', 'danger'); setCardState('card-tamper', 'danger'); pushAlert('danger', 'Tamper event — LDR detected light inside sealed box.'); }
+      else { if(dot) dot.className = 'tamper-dot sealed'; if(tt) tt.textContent = 'Box is sealed'; setStatus('status-tamper', 'No breach detected', 'ok'); setCardState('card-tamper', ''); }
+
+      if (p.uptime_s !== undefined) { document.getElementById('val-uptime').textContent = fmtUptime(p.uptime_s); setStatus('status-uptime', 'Device online', 'ok'); }
+
+      var hs = computeHealthScore(temp, hum, g, p.tamper, p.health_score); var grade = gradeFromScore(hs.total); var hsEl = document.getElementById('health-score-number');
+      if(hsEl) { hsEl.textContent = hs.total; hsEl.className = 'health-score-number ' + grade.cls; }
+      document.getElementById('health-grade').textContent = grade.label;
+
+      var rows = [{ bar: 'bbar-temp', sc: 'bscore-temp', val: hs.t }, { bar: 'bbar-hum', sc: 'bscore-hum', val: hs.h }, { bar: 'bbar-g', sc: 'bscore-g', val: hs.g }, { bar: 'bbar-tamper', sc: 'bscore-tamper', val: hs.seal }];
+      rows.forEach(function(r) {
+        var b = document.getElementById(r.bar); if(b) { b.style.width = r.val + '%'; b.className = 'breakdown-bar ' + barCls(r.val); }
+        var sc = document.getElementById(r.sc); if(sc) { sc.textContent = r.val; sc.className = 'breakdown-score ' + barCls(r.val).replace('danger','danger').replace('warn','warn') || 'ok'; }
+      });
+
+      document.getElementById('raw-payload').textContent = JSON.stringify(p, null, 2);
+      document.getElementById('meta-packets').textContent = packetCount;
+      if (p.rssi !== undefined) document.getElementById('meta-rssi').textContent = p.rssi + ' dBm';
+    }
+
+    // Dynamic Safe Network Routing Layer
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const hostAddress = window.location.host || '127.0.0.1:8000';
+    const wsUrl = `${protocol}//${hostAddress}/ws/dashboard`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      document.getElementById('meta-proto').textContent = "WEBSOCKET / HTTP";
+      document.getElementById('meta-ip').textContent = window.location.hostname || "127.0.0.1";
+    };
+    ws.onmessage = (event) => { updateUI(JSON.parse(event.data)); };
+    ws.onclose = () => { document.getElementById('conn-label').textContent = 'Disconnected'; document.getElementById('conn-dot').style.background = 'var(--danger)'; };
+  </script>
+</body>
+</html>
