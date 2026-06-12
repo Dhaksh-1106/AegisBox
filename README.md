@@ -239,9 +239,9 @@ Live Dashboard
 
 | Member | Responsibility |
 |----------|----------------|
-| **[Dhaksh S Kumar]**(https://github.com/Dhaksh-1106) | Embedded Firmware Engineering & Edge Node Architecture |
-| **[Deepesh Kumar]**(https://github.com/DeepSisphysus) | Frontend User Interface Design & Visual Layout |
-| **[Bharath Raghuraman]**(https://github.com/BurgeryJuice) | Backend Infrastructure & Parameter Compatibility Integration |
+| [Dhaksh S Kumar](https://github.com/Dhaksh-1106) | Embedded Firmware Engineering & Edge Node Architecture |
+| [Deepesh Kumar](https://github.com/DeepSisphysus) | Frontend User Interface Design & Visual Layout |
+| [Bharath Raghuraman](https://github.com/BurgeryJuice) | Backend Infrastructure & Parameter Compatibility Integration |
 
 ---
 
